@@ -31,6 +31,9 @@ const mainElement = ref<HTMLElement | null>(null);
 const caseMessage = ref('');
 const documents = computed(() => archiveDocuments.filter((document) => document.caseId === archive.currentCaseId));
 const activeDocument = computed(() => activeDocumentId.value ? documentById[activeDocumentId.value] : null);
+const incompleteCaseMessage = computed(() => archive.currentCaseProgress.timeline === false
+  ? ui.value.timelinePending
+  : `${ui.value.completeAllStages} ${ui.value.materialsPending}`);
 const atmosphereTab = computed<'documents' | 'board' | 'music' | null>(() => activeTab.value === 'documents' || activeTab.value === 'board' || activeTab.value === 'music' ? activeTab.value : null);
 const atmosphereAsset = computed(() => caseAtmosphereAssets[atmosphereTab.value ?? 'documents'][archive.currentCaseId]);
 const tabs = computed(() => [
@@ -162,7 +165,7 @@ function openFinal(): void { archive.completeLevel01(); showFinal(); }
         <footer v-if="activeTab !== 'assessment' && activeTab !== 'level'" class="archive-case-footer">
           <DemaAlert v-if="archive.progress.completedCases.includes(archive.currentCaseId)" variant="success" :title="ui.caseCompleted" :message="caseMessage || ui.caseFiled" compact />
           <DemaAlert v-else-if="caseMessage" variant="success" :title="ui.systemNote" :message="caseMessage" compact />
-          <DemaAlert v-else-if="!archive.currentCaseReady" variant="danger" :title="ui.cannotCloseCase" :message="`${ui.completeAllStages} ${ui.materialsPending}`" compact />
+          <DemaAlert v-else-if="!archive.currentCaseReady" variant="danger" :title="ui.cannotCloseCase" :message="incompleteCaseMessage" compact />
           <DemaAlert v-else variant="info" :title="ui.archiveAwaiting" :message="ui.caseReady" compact />
           <button type="button" :class="{ ready: archive.currentCaseReady }" :disabled="!archive.currentCaseReady || archive.progress.completedCases.includes(archive.currentCaseId)" @click="completeCase">{{ archive.progress.completedCases.includes(archive.currentCaseId) ? `✓ ${ui.completed}` : ui.fileCase }}</button>
           <small>{{ ui.unofficial }}</small>

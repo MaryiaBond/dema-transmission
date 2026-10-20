@@ -7,6 +7,7 @@ import DemaAlert from './DemaAlert.vue';
 import EvidenceViewer from './EvidenceViewer.vue';
 import { archiveConnections, archiveEvidence, archiveText, documentById, evidenceById } from '@/content/archive-content';
 import { archiveLocales } from '@/content/archive-locales';
+import { getDiscoveredEvidenceIds } from './archive-engine';
 import { useArchiveStore } from '@/stores/archive';
 import { useExperienceStore } from '@/stores/experience';
 import type { EvidenceId } from '@/types/archive';
@@ -34,7 +35,7 @@ let timelineStatusTimer: number | undefined;
 let reducedMotionQuery: MediaQueryList | null = null;
 const solution = ref(archive.progress.caseSolutions[archive.currentCaseId] ?? '');
 const caseEvidence = computed(() => archiveEvidence.filter((item) => item.caseId === archive.currentCaseId));
-const discovered = computed(() => caseEvidence.value.filter((item) => archive.progress.discoveredEvidence.includes(item.id)));
+const discoveredEvidenceIds = computed(() => new Set(getDiscoveredEvidenceIds(archive.progress)));
 const findings = computed(() => archiveConnections.filter((item) => item.caseId === archive.currentCaseId && archive.progress.confirmedConnections.includes(item.id)));
 const sequence = computed(() => archive.progress.caseSequences[archive.currentCaseId] ?? []);
 
@@ -201,10 +202,12 @@ function handleTimelineKeydown(event: KeyboardEvent, id: EvidenceId): void {
     <div class="archive-panel-heading"><span>{{ ui.board }}</span><small>{{ ui.selectEvidence }}</small></div>
     <div ref="evidenceField" class="evidence-field">
       <span v-if="feedback?.kind === 'correct' && connectionLineStyle" class="bandito-link" :style="connectionLineStyle" aria-hidden="true"><i></i></span>
-      <button v-for="item in discovered" :key="item.id" :ref="(element) => setEvidenceCard(item.id, element)" type="button" class="evidence-card" :data-evidence="item.id" :data-connection-state="feedback?.evidence.includes(item.id) ? feedback.kind : undefined" :class="{ selected: selected.includes(item.id), 'connection-rejected': feedback?.kind === 'wrong' && feedback.evidence.includes(item.id), 'connection-confirmed': feedback?.kind === 'correct' && feedback.evidence.includes(item.id) }" :aria-pressed="selected.includes(item.id)" @click="toggle(item.id)">
-        <EvidenceViewer :evidence="item" />
-      </button>
-      <div v-for="item in caseEvidence.filter((e) => !archive.progress.discoveredEvidence.includes(e.id))" :key="item.id" class="evidence-card evidence-card-locked" aria-hidden="true"><span>████</span><small>{{ ui.undiscovered }}</small></div>
+      <template v-for="item in caseEvidence" :key="item.id">
+        <button v-if="discoveredEvidenceIds.has(item.id)" :ref="(element) => setEvidenceCard(item.id, element)" type="button" class="evidence-card" :data-evidence="item.id" :data-connection-state="feedback?.evidence.includes(item.id) ? feedback.kind : undefined" :class="{ selected: selected.includes(item.id), 'connection-rejected': feedback?.kind === 'wrong' && feedback.evidence.includes(item.id), 'connection-confirmed': feedback?.kind === 'correct' && feedback.evidence.includes(item.id) }" :aria-pressed="selected.includes(item.id)" @click="toggle(item.id)">
+          <EvidenceViewer :evidence="item" />
+        </button>
+        <div v-else class="evidence-card evidence-card-locked" aria-hidden="true"><span>████</span><small>{{ ui.undiscovered }}</small></div>
+      </template>
     </div>
     <div class="connection-controls">
       <span>{{ ui.selectedEvidence }} // {{ selected.length }}/2</span>
@@ -218,7 +221,9 @@ function handleTimelineKeydown(event: KeyboardEvent, id: EvidenceId): void {
 
     <div v-if="archive.currentCase.correctSequence" class="timeline-board" data-testid="timeline-board">
       <div class="archive-panel-heading"><span>{{ ui.timeline }}</span><small id="timeline-sort-hint" :class="{ 'is-subdued': timelineMoved }">{{ ui.timelineHint }}</small></div>
-      <p v-if="timelineStatus" class="timeline-status" role="status" aria-live="polite">{{ timelineStatus }}</p>
+      <Transition name="timeline-toast">
+        <p v-if="timelineStatus" class="timeline-status" role="status" aria-live="polite">{{ timelineStatus }}</p>
+      </Transition>
       <ol ref="timelineList" class="timeline-sortable" :aria-label="ui.timeline">
         <li v-for="(id, index) in sequence" :key="id" class="timeline-card" :class="{ 'is-keyboard-grabbed': keyboardGrabbedId === id }" :data-evidence="id">
           <span class="timeline-position">{{ String(index + 1).padStart(2, '0') }}</span>

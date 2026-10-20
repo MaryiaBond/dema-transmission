@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { archiveCases, archiveConnections, archiveDocuments, archiveMusicRecords, assessmentQuestions, assessmentResult } from '@/content/archive-content';
 import { archiveLocales } from '@/content/archive-locales';
 import { achievementConditions } from '@/features/archive/achievement-engine';
-import { ARCHIVE_STORAGE_KEY, completeAssessment, completeCase, completeLevel01, completeOnboarding, createPlayerProgress, discoverDocument, getCaseProgress, isAssessmentUnlocked, markMusicStudied, mergeProgress, moveTimelineItem, recordAssessmentAnswer, recordCaseSolution, reorderTimelineItem, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
-import { loadLocalProgress, saveLocalProgress } from '@/features/archive/archive-persistence';
+import { ARCHIVE_STORAGE_KEY, completeAssessment, completeCase, completeLevel01, completeOnboarding, createPlayerProgress, discoverDocument, getCaseProgress, getDiscoveredEvidenceIds, isAssessmentUnlocked, markMusicStudied, mergeProgress, moveTimelineItem, recordAssessmentAnswer, recordCaseSolution, reorderTimelineItem, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
+import { loadLocalProgress, normalizePlayerProgress, saveLocalProgress } from '@/features/archive/archive-persistence';
 import type { CaseId, PlayerProgress } from '@/types/archive';
 
 const now = '2026-10-19T12:00:00.000Z';
@@ -62,6 +62,32 @@ describe('DEMA Archive engine', () => {
     expect(getCaseProgress(progress, 'case_001')).toMatchObject({ documents: { done: true }, records: { done: true }, percentage: 100, ready: true, status: 'in_progress' });
   });
 
+  it('keeps CASE 001 at 88% until the exact timeline is verified, then unlocks CASE 002', () => {
+    let progress = createPlayerProgress('timeline-readiness', now);
+    for (const documentId of archiveCases[0]!.documentIds) progress = discoverDocument(progress, documentId, now);
+    const connection = archiveConnections.find((item) => item.id === 'lineup_transition')!;
+    progress = testConnection(progress, 'case_001', connection.evidence[0], connection.evidence[1], now).progress;
+    for (const recordId of archiveCases[0]!.musicRecordIds) progress = markMusicStudied(progress, recordId, now);
+
+    expect(getCaseProgress(progress, 'case_001')).toMatchObject({
+      documents: { completed: 3, done: true },
+      connections: { completed: 1, done: true },
+      records: { completed: 3, done: true },
+      timeline: false,
+      percentage: 88,
+      ready: false
+    });
+    expect(completeCase(progress, 'case_001', now).completed).toBe(false);
+
+    progress = { ...progress, caseSequences: { ...progress.caseSequences, case_001: [...archiveCases[0]!.correctSequence!, 'dun_arrival'] } };
+    expect(getCaseProgress(progress, 'case_001').timeline).toBe(false);
+    progress = { ...progress, caseSequences: { ...progress.caseSequences, case_001: [...archiveCases[0]!.correctSequence!] } };
+    expect(getCaseProgress(progress, 'case_001')).toMatchObject({ timeline: true, percentage: 100, ready: true });
+    const filed = completeCase(progress, 'case_001', now);
+    expect(filed.completed).toBe(true);
+    expect(filed.progress.unlockedCases).toContain('case_002');
+  });
+
   it('reorders timeline items to any index while preserving the adjacent-move API', () => {
     const fresh = createPlayerProgress('timeline-test', now);
     const initial = [...fresh.caseSequences.case_001!];
@@ -104,6 +130,28 @@ describe('DEMA Archive engine', () => {
     const restored = loadLocalProgress(ARCHIVE_STORAGE_KEY);
     expect(restored.discoveredEvidence).toEqual(expect.arrayContaining(['salih_departure', 'dun_arrival', 'thomas_departure']));
     expect(restored.investigatedMusicRecords.jumpsuit).toMatchObject({ visitedExternalLink: true, markedAsStudied: true, studiedAt: now });
+  });
+
+  it('restores evidence immediately from studied documents in legacy local progress', () => {
+    const progress = createPlayerProgress('legacy-evidence', now);
+    const normalized = normalizePlayerProgress({
+      ...progress,
+      studiedDocumentIds: ['doc_001_roster', 'doc_001_changes'],
+      discoveredEvidence: [],
+      caseSequences: {}
+    });
+    expect(normalized.discoveredEvidence).toEqual(expect.arrayContaining(['founding_lineup', 'salih_departure', 'dun_arrival', 'thomas_departure']));
+    expect(normalized.caseSequences.case_001).toEqual(archiveCases[0]!.initialSequence);
+    expect(normalizePlayerProgress(normalized)).toEqual(normalized);
+  });
+
+  it('derives only the evidence belonging to studied documents in every case', () => {
+    let progress = createPlayerProgress('evidence-mapping', now);
+    for (const definition of archiveCases) {
+      for (const documentId of definition.documentIds) progress = { ...progress, studiedDocumentIds: [...progress.studiedDocumentIds, documentId] };
+      expect(getDiscoveredEvidenceIds(progress)).toEqual(expect.arrayContaining([...definition.evidenceIds]));
+    }
+    expect(getDiscoveredEvidenceIds({ studiedDocumentIds: ['doc_002_visual'], discoveredEvidence: [] })).toEqual(['yellow_petals', 'yellow_tape']);
   });
 
   it('does not award duplicate achievements', () => {

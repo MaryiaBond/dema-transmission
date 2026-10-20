@@ -22,11 +22,11 @@ const statusLabel = computed(() => ({
     </header>
     <div class="case-progress-meter" aria-hidden="true"><i :style="{ width: `${progress.percentage}%` }"></i></div>
     <ul>
-      <li :class="{ done: progress.documents.done }"><span>{{ ui.documentsProgress }}</span><strong>{{ progress.documents.completed }}/{{ progress.documents.total }}</strong></li>
-      <li :class="{ done: progress.connections.done }"><span>{{ ui.connectionsProgress }}</span><strong>{{ progress.connections.completed }}/{{ progress.connections.total }}</strong></li>
-      <li :class="{ done: progress.records.done }"><span>{{ ui.recordsProgress }}</span><strong>{{ progress.records.completed }}/{{ progress.records.total }}</strong></li>
-      <li v-if="progress.timeline !== null" :class="{ done: progress.timeline }"><span>{{ ui.timelineProgress }}</span><strong>{{ progress.timeline ? ui.verified : ui.pending }}</strong></li>
-      <li v-if="progress.cipher !== null" :class="{ done: progress.cipher }"><span>{{ ui.cipherProgress }}</span><strong>{{ progress.cipher ? ui.verified : ui.pending }}</strong></li>
+      <li data-requirement="documents" :class="{ done: progress.documents.done }"><span>{{ ui.documentsProgress }}</span><strong>{{ progress.documents.completed }}/{{ progress.documents.total }}</strong></li>
+      <li data-requirement="connections" :class="{ done: progress.connections.done }"><span>{{ ui.connectionsProgress }}</span><strong>{{ progress.connections.completed }}/{{ progress.connections.total }}</strong></li>
+      <li data-requirement="records" :class="{ done: progress.records.done }"><span>{{ ui.recordsProgress }}</span><strong>{{ progress.records.completed }}/{{ progress.records.total }}</strong></li>
+      <li v-if="progress.timeline !== null" data-requirement="timeline" :class="{ done: progress.timeline }"><span>{{ ui.timelineProgress }}</span><strong>{{ progress.timeline ? ui.verified : ui.pending }}</strong></li>
+      <li v-if="progress.cipher !== null" data-requirement="cipher" :class="{ done: progress.cipher }"><span>{{ ui.cipherProgress }}</span><strong>{{ progress.cipher ? ui.verified : ui.pending }}</strong></li>
     </ul>
   </section>
 </template>

@@ -1,4 +1,4 @@
-import { createPlayerProgress } from './archive-engine';
+import { createPlayerProgress, getDiscoveredEvidenceIds } from './archive-engine';
 import { archiveDocuments } from '@/content/archive-content';
 import type { PlayerProgress } from '@/types/archive';
 
@@ -12,7 +12,8 @@ export function normalizePlayerProgress(parsed: PlayerProgress): PlayerProgress 
   const inferredDocuments = archiveDocuments
     .filter((document) => document.evidenceIds.every((id) => discoveredEvidence.includes(id)))
     .map((document) => document.id);
-  return {
+  const studiedDocumentIds = parsed.studiedDocumentIds ?? inferredDocuments;
+  const normalized: PlayerProgress = {
     ...fresh,
     ...parsed,
     employeeId: 'EMPLOYEE 021',
@@ -21,9 +22,12 @@ export function normalizePlayerProgress(parsed: PlayerProgress): PlayerProgress 
     onboardingCompletedAt: parsed.onboardingCompletedAt ?? null,
     level01CompletedAt: parsed.level01CompletedAt ?? null,
     clearanceLevel: parsed.clearanceLevel ?? (parsed.level01CompletedAt ? 'UNDER OBSERVATION' : 'ARCHIVE ENTRY'),
-    studiedDocumentIds: parsed.studiedDocumentIds ?? inferredDocuments,
-    caseSolutions: parsed.caseSolutions ?? {}
+    studiedDocumentIds,
+    discoveredEvidence,
+    caseSolutions: parsed.caseSolutions ?? {},
+    caseSequences: { ...fresh.caseSequences, ...(parsed.caseSequences ?? {}) }
   };
+  return { ...normalized, discoveredEvidence: getDiscoveredEvidenceIds(normalized) };
 }
 
 export function loadLocalProgress(key: string): PlayerProgress {

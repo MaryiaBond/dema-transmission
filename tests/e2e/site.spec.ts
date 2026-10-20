@@ -46,13 +46,17 @@ test('keeps compact external music links and ends after the seventh chapter', as
   await expect(page.locator('[data-service="spotify"]').first()).toHaveAttribute('href', /^https:\/\/open\.spotify\.com\//);
   await expect(page.locator('[data-service="yandex"]').first()).toHaveAttribute('href', /^https:\/\/music\.yandex\.ru\//);
   await expect(page.locator('[data-service="youtube"]').first()).toHaveAttribute('href', /^https:\/\/(?:www\.)?youtube\.com\//);
-  const icon = page.locator('.music-link .service-icon').first();
-  await expect(icon).toBeVisible();
-  const size = await icon.evaluate((element) => ({ width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }));
-  expect(size.width).toBeGreaterThanOrEqual(15);
-  expect(size.width).toBeLessThanOrEqual(20);
-  expect(size.height).toBeGreaterThanOrEqual(15);
-  expect(size.height).toBeLessThanOrEqual(20);
+  const watchButtons = page.locator('.watch-row').first().locator('.watch-buttons a');
+  await expect(watchButtons).toHaveCount(3);
+  const geometry = await watchButtons.evaluateAll((buttons) => buttons.map((button) => {
+    const box = button.getBoundingClientRect();
+    const icon = button.querySelector('.service-icon')!.getBoundingClientRect();
+    return { height: box.height, iconWidth: icon.width, iconHeight: icon.height };
+  }));
+  expect(geometry.every(({ height }) => height >= 44)).toBe(true);
+  expect(geometry.every(({ iconWidth, iconHeight }) => iconWidth >= 18 && iconWidth <= 20 && iconHeight >= 18 && iconHeight <= 20)).toBe(true);
+  await expect(watchButtons.nth(0).locator('img')).toHaveAttribute('src', '/assets/youtube.svg');
+  expect(await page.locator('.watch-row').first().locator('.watch-buttons').evaluate((buttons) => buttons.scrollWidth - buttons.clientWidth)).toBeLessThanOrEqual(1);
   await page.evaluate(() => localStorage.setItem('the-outside-cycle-progress', '{legacy-cycle-data'));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.locator('#chapter-6').scrollIntoViewIfNeeded();

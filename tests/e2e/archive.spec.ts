@@ -39,6 +39,20 @@ const completeFixture = {
   updatedAt: '2026-10-19T12:00:00.000Z'
 };
 
+const caseOneAtEightyEightFixture = {
+  ...completeFixture,
+  playerId: 'e2e-case-001-readiness',
+  unlockedCases: ['case_001'],
+  completedCases: [],
+  discoveredEvidence: ['founding_lineup', 'salih_departure', 'dun_arrival', 'thomas_departure'],
+  confirmedConnections: ['lineup_transition'],
+  studiedDocumentIds: ['doc_001_roster', 'doc_001_changes', 'doc_001_photo'],
+  investigatedMusicRecords: Object.fromEntries(['heavydirtysoul', 'jumpsuit', 'iamclancy'].map((musicRecordId) => [musicRecordId, { musicRecordId, visitedExternalLink: false, markedAsStudied: true, studiedAt: '2026-10-19T12:00:00.000Z' }])),
+  achievements: [],
+  caseSolutions: {},
+  caseSequences: { case_001: ['dun_arrival', 'founding_lineup', 'thomas_departure', 'salih_departure'] }
+};
+
 async function openArchive(page: import('@playwright/test').Page) {
   await page.locator('#archiveInvite').scrollIntoViewIfNeeded();
   await page.locator('#archiveInvite .action-primary').click();
@@ -183,6 +197,8 @@ test('reorders the timeline across arbitrary and adjacent positions and persists
   const initial = ['dun_arrival', 'founding_lineup', 'thomas_departure', 'salih_departure'];
   await expect.poll(() => timelineIds(page)).toEqual(initial);
   await expect(page.getByTestId('timeline-board').getByRole('button', { name: /Move earlier|Move later/ })).toHaveCount(0);
+  const timelineList = page.getByTestId('timeline-board').locator('.timeline-sortable');
+  await timelineList.scrollIntoViewIfNeeded();
 
   if (testInfo.project.name === 'desktop') {
     await dragTimeline(page, 0, 3, testInfo);
@@ -197,12 +213,137 @@ test('reorders the timeline across arbitrary and adjacent positions and persists
     await expect.poll(() => timelineIds(page)).toEqual(['salih_departure', 'founding_lineup', 'dun_arrival', 'thomas_departure']);
   }
   const persisted = await timelineIds(page);
-  await expect(page.getByTestId('timeline-board')).toContainText('SEQUENCE UPDATED');
+  const timelineToast = page.getByTestId('timeline-board').locator('.timeline-status');
+  await expect(timelineToast).toHaveText('SEQUENCE UPDATED');
+  await expect(timelineToast).toHaveCSS('position', 'fixed');
+  const listTopWithToast = await timelineList.evaluate((element) => element.getBoundingClientRect().top);
+  await expect(timelineToast).toHaveCount(0, { timeout: 2500 });
+  expect(Math.abs(await timelineList.evaluate((element) => element.getBoundingClientRect().top) - listTopWithToast)).toBeLessThanOrEqual(1);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await openArchive(page);
   await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
   await expect.poll(() => timelineIds(page)).toEqual(persisted);
+});
+
+test('shows every CASE 001 requirement and only files the case after the exact timeline persists', async ({ page }) => {
+  await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), caseOneAtEightyEightFixture);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  const checklist = page.getByTestId('case-progress-checklist');
+  await expect(checklist).toContainText('88%');
+  await expect(checklist.locator('[data-requirement="documents"]')).toContainText('3/3');
+  await expect(checklist.locator('[data-requirement="connections"]')).toContainText('1/1');
+  await expect(checklist.locator('[data-requirement="records"]')).toContainText('3/3');
+  await expect(checklist.locator('[data-requirement="timeline"]')).toContainText('PENDING');
+  await expect(page.locator('.archive-case-footer')).toContainText('The timeline is not verified');
+  await expect(page.getByRole('button', { name: 'FILE CASE' })).toBeDisabled();
+
+  await page.evaluate((correctSequence) => {
+    const key = 'the-outside-archive-progress-v1';
+    const saved = JSON.parse(localStorage.getItem(key)!);
+    saved.caseSequences.case_001 = correctSequence;
+    localStorage.setItem(key, JSON.stringify(saved));
+  }, ['founding_lineup', 'salih_departure', 'dun_arrival', 'thomas_departure']);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  await expect(page.getByTestId('case-progress-checklist')).toContainText('100%');
+  await page.getByRole('button', { name: 'FILE CASE' }).click();
+  await expect(page.locator('.archive-case-rail button').filter({ hasText: 'CASE 002' })).toBeEnabled();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  await expect(page.locator('.archive-case-rail button').filter({ hasText: 'CASE 002' })).toBeEnabled();
+});
+
+test('unlocks evidence from studied documents immediately and restores every case on first render', async ({ page }) => {
+  const emptyArchive = {
+    ...completeFixture,
+    playerId: 'e2e-evidence-lifecycle',
+    completedCases: [],
+    studiedDocumentIds: [],
+    discoveredEvidence: [],
+    confirmedConnections: [],
+    investigatedMusicRecords: {},
+    achievements: []
+  };
+  await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), emptyArchive);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+
+  await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+  await expect(page.locator('.evidence-card-locked')).toHaveCount(4);
+  await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(0);
+  await page.locator('.archive-tabs button').filter({ hasText: 'DOCUMENTS' }).click();
+  await page.locator('.archive-document-list>button').nth(0).click();
+  await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+  await expect(page.locator('.evidence-card[data-evidence="founding_lineup"]')).toContainText('2009 lineup');
+  await expect(page.locator('.evidence-card[data-evidence="founding_lineup"]')).toContainText('Tyler Joseph, Nick Thomas, Chris Salih');
+  await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(1);
+  await expect(page.locator('.evidence-card-locked')).toHaveCount(3);
+
+  await page.locator('.archive-tabs button').filter({ hasText: 'DOCUMENTS' }).click();
+  await page.locator('.archive-document-list>button').nth(1).click();
+  await page.locator('.archive-document-list>button').nth(2).click();
+  await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+  await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(4);
+  await expect(page.locator('.evidence-card-locked')).toHaveCount(0);
+  for (const title of ['2009 lineup', 'Chris Salih departs', 'Josh Dun arrives', 'Nick Thomas departs']) {
+    await expect(page.locator('.evidence-card[data-evidence]').filter({ hasText: title })).toBeEnabled();
+  }
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+  await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(4);
+  await expect(page.locator('.evidence-card-locked')).toHaveCount(0);
+
+  const cases = [
+    { code: 'CASE 002', firstEvidence: ['yellow_petals', 'yellow_tape'], allEvidence: 3, visibleText: 'Yellow petals' },
+    { code: 'CASE 003', firstEvidence: ['sai_broadcast'], allEvidence: 3, visibleText: 'Perfect broadcast' }
+  ] as const;
+  for (const scenario of cases) {
+    await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), emptyArchive);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await openArchive(page);
+    await page.locator('.archive-case-rail button').filter({ hasText: scenario.code }).click();
+    const documents = page.locator('.archive-document-list>button');
+    await documents.nth(0).click();
+    await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+    await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(scenario.firstEvidence.length);
+    for (const evidenceId of scenario.firstEvidence) await expect(page.locator(`.evidence-card[data-evidence="${evidenceId}"]`)).toBeEnabled();
+    await expect(page.locator('.evidence-card[data-evidence]').first()).toContainText(scenario.visibleText);
+    await page.locator('.archive-tabs button').filter({ hasText: 'DOCUMENTS' }).click();
+    await documents.nth(1).click();
+    await documents.nth(2).click();
+    await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+    await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(scenario.allEvidence);
+    await expect(page.locator('.evidence-card-locked')).toHaveCount(0);
+  }
+
+  const { discoveredEvidence: _discardedEvidence, ...legacyWithoutEvidenceIds } = {
+    ...emptyArchive,
+    studiedDocumentIds: completeFixture.studiedDocumentIds
+  };
+  await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), legacyWithoutEvidenceIds);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  for (const scenario of [{ code: 'CASE 001', count: 4 }, { code: 'CASE 002', count: 3 }, { code: 'CASE 003', count: 3 }]) {
+    await page.locator('.archive-case-rail button').filter({ hasText: scenario.code }).click();
+    await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+    await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(scenario.count);
+    await expect(page.locator('.evidence-card-locked')).toHaveCount(0);
+  }
+
+  const partialLegacy = { ...emptyArchive, studiedDocumentIds: ['doc_002_visual'], discoveredEvidence: ['yellow_petals'] };
+  await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), partialLegacy);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  await page.locator('.archive-case-rail button').filter({ hasText: 'CASE 002' }).click();
+  await page.locator('.archive-tabs button').filter({ hasText: 'BOARD' }).click();
+  await expect(page.locator('.evidence-card[data-evidence="yellow_petals"]')).toContainText('Yellow petals');
+  await expect(page.locator('.evidence-card[data-evidence="yellow_tape"]')).toContainText('Bandito tape');
+  await expect(page.locator('.evidence-card[data-evidence]')).toHaveCount(2);
+  await expect(page.locator('.evidence-card-locked')).toHaveCount(1);
 });
 
 test('supports keyboard timeline sorting without visible arrow controls', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { archiveCases, archiveConnections, assessmentQuestions, caseById, documentById } from '@/content/archive-content';
+import { archiveCases, archiveConnections, archiveDocuments, assessmentQuestions, caseById, documentById } from '@/content/archive-content';
 import { registerAchievements, studiedRecordCount } from './achievement-engine';
 import type { AssessmentAnswerId, AssessmentQuestionId, CaseId, CaseProgressMetric, CaseProgressState, DocumentId, EvidenceId, MusicRecordId, PlayerProgress } from '@/types/archive';
 
@@ -6,6 +6,14 @@ export const ARCHIVE_STORAGE_KEY = 'the-outside-archive-progress-v1';
 
 const unique = <T>(items: readonly T[]): T[] => [...new Set(items)];
 const stamp = (progress: PlayerProgress, now: string): PlayerProgress => registerAchievements({ ...progress, updatedAt: now }, now);
+
+export function getDiscoveredEvidenceIds(progress: Pick<PlayerProgress, 'studiedDocumentIds' | 'discoveredEvidence'>): EvidenceId[] {
+  const studiedDocumentIds = progress.studiedDocumentIds ?? [];
+  const evidenceFromStudiedDocuments = archiveDocuments
+    .filter((document) => studiedDocumentIds.includes(document.id))
+    .flatMap((document) => document.evidenceIds);
+  return unique([...(progress.discoveredEvidence ?? []), ...evidenceFromStudiedDocuments]);
+}
 
 export function createPlayerProgress(playerId: string, now = new Date().toISOString()): PlayerProgress {
   return {
@@ -60,11 +68,15 @@ const metric = (completed: number, total: number): CaseProgressMetric => ({ comp
 export function getCaseProgress(progress: PlayerProgress, caseId: CaseId): CaseProgressState {
   const current = caseById[caseId];
   const studiedDocumentIds = progress.studiedDocumentIds ?? [];
+  const discoveredEvidence = getDiscoveredEvidenceIds(progress);
   const documents = metric(current.documentIds.filter((id) => studiedDocumentIds.includes(id)).length, current.documentIds.length);
   const connections = metric(current.requiredConnectionIds.filter((id) => progress.confirmedConnections.includes(id)).length, current.requiredConnectionIds.length);
   const records = metric(current.musicRecordIds.filter((id) => progress.investigatedMusicRecords[id]?.markedAsStudied).length, current.musicRecordIds.length);
-  const evidenceReady = current.evidenceIds.every((id) => progress.discoveredEvidence.includes(id));
-  const timeline = current.correctSequence ? current.correctSequence.every((id, index) => progress.caseSequences[caseId]?.[index] === id) : null;
+  const evidenceReady = current.evidenceIds.every((id) => discoveredEvidence.includes(id));
+  const savedSequence = progress.caseSequences[caseId] ?? current.initialSequence ?? [];
+  const timeline = current.correctSequence
+    ? savedSequence.length === current.correctSequence.length && current.correctSequence.every((id, index) => savedSequence[index] === id)
+    : null;
   const cipher = caseId === 'case_003' ? progress.caseSolutions.case_003?.replace(/[^a-z]/gi, '').toLowerCase() === 'clancyisdead' : null;
   const binaryChecks = [timeline, cipher].filter((value): value is boolean => value !== null);
   const completedUnits = documents.completed + connections.completed + records.completed + binaryChecks.filter(Boolean).length;
