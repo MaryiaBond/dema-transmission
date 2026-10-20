@@ -21,11 +21,10 @@
 1. Открыть THE ARCHIVE из шапки или блока приглашения и пройти три шага ориентации EMPLOYEE 021.
 2. Завершить `case_001`; это разблокирует `case_002`.
 3. Завершить `case_002`; это разблокирует `case_003`.
-4. Завершить `case_003`.
-5. Вручную отметить изученными все девять музыкальных записей. Открытие внешних ссылок не обязательно.
-6. После трёх завершённых дел и девяти отметок пройти философскую аттестацию из девяти вопросов.
-7. На результате аттестации нажать «ПРОДОЛЖИТЬ», затем принять уровень допуска.
-8. Финальная запись показывает `LEVEL 02 / CLASSIFIED / IN DEVELOPMENT` и 💩 🦄.
+4. Завершить `case_003`. Для закрытия каждого дела уже потребуется отметить изученными три закреплённые за ним музыкальные записи.
+5. После трёх завершённых дел — следовательно, после всех девяти музыкальных отметок — пройти философскую аттестацию из девяти вопросов.
+6. На результате аттестации нажать «ПРОДОЛЖИТЬ», затем принять уровень допуска.
+7. Финальная запись показывает `LEVEL 02 / CLASSIFIED / IN DEVELOPMENT` и 💩 🦄.
 
 Начальное состояние создаёт `createPlayerProgress`: доступен только `case_001`, статус сотрудника — `appointed`, допуск — `ARCHIVE ENTRY`. Ориентация вызывает `completeOnboarding` и меняет статус на `active`. Источник: `src/features/archive/archive-engine.ts`, правила `createPlayerProgress` и `completeOnboarding`.
 
@@ -35,12 +34,14 @@
 
 Для завершения дела функция `isCaseReady` одновременно требует:
 
+- все `documentIds` текущего CASE должны присутствовать в `studiedDocumentIds`;
 - все `evidenceIds` текущего CASE должны быть обнаружены;
 - все `requiredConnectionIds` должны быть подтверждены на доске;
+- все `musicRecordIds` текущего CASE должны иметь `markedAsStudied: true`;
 - если у дела есть `correctSequence`, текущая хронология должна совпасть с ней по каждой позиции;
 - для `case_003` дополнительно должна быть введена правильная расшифровка.
 
-Затем `completeCase` проверяет, что дело разблокировано, завершает его и добавляет следующее дело из `archiveCases` в `unlockedCases`. Порядок выбора двух улик в паре не важен: `testConnection` проверяет наличие обеих разных улик в правиле связи.
+Состояние каждого пункта, общий процент и статус дела вычисляет `getCaseProgress`; `isCaseReady` использует его итоговый флаг `ready`. Затем `completeCase` проверяет, что дело разблокировано, завершает его и добавляет следующее дело из `archiveCases` в `unlockedCases`. Порядок выбора двух улик в паре не важен: `testConnection` проверяет наличие обеих разных улик в правиле связи.
 
 ## CASE 001 — THE MISSING MEMBERS
 
@@ -54,9 +55,9 @@
 |---|---|---|---|
 | `doc_001_roster` | «Реестр основания» | `founding_lineup` — «Состав 2009» | Да |
 | `doc_001_changes` | «Журнал изменений» | `salih_departure` — «Уход Chris Salih»; `dun_arrival` — «Приход Josh Dun»; `thomas_departure` — «Уход Nick Thomas» | Да |
-| `doc_001_photo` | «Утверждённая сводка» | `founding_lineup` — «Состав 2009» | Нет: дублирует улику из `doc_001_roster`; рекомендуется прочитать для сюжета |
+| `doc_001_photo` | «Утверждённая сводка» | `founding_lineup` — «Состав 2009» | Да |
 
-Полный UI-счётчик улик становится `4 / 4` после первых двух документов. Валидатор проверяет улики, а не список открытых документов: `src/features/archive/archive-engine.ts`, `discoverDocument` и `isCaseReady`; соответствия документов и улик — `src/content/archive-content.ts`, `case_001` и `archiveDocuments`.
+Несмотря на дублирование `founding_lineup`, закрытие дела требует открыть все три документа. `discoverDocument` отдельно сохраняет ID документа в `studiedDocumentIds`, а `getCaseProgress` проверяет полный `case_001.documentIds`. Источник: `src/features/archive/archive-engine.ts`; соответствия документов и улик — `src/content/archive-content.ts`, `case_001` и `archiveDocuments`.
 
 ### Правильная связь
 
@@ -81,7 +82,7 @@
 
 ### Завершение и награда
 
-Когда найдены все четыре улики, подтверждён `lineup_transition` и выставлена точная хронология, индикатор сообщает о достаточности набора. Нажать «ЗАВЕРШИТЬ ДЕЛО».
+Когда открыты все три документа, найдены четыре улики, подтверждён `lineup_transition`, изучены `heavydirtysoul`, `jumpsuit` и `iamclancy`, а также выставлена точная хронология, готовность станет `100%` и кнопка «ЗАВЕРШИТЬ ДЕЛО» разблокируется.
 
 - завершённое дело: `case_001`;
 - разблокируется: `case_002`;
@@ -101,9 +102,9 @@
 |---|---|---|---|
 | `doc_002_visual` | «Визуальная запись» | `yellow_petals` — «Жёлтые лепестки»; `yellow_tape` — «Ленты Бандитос» | Да |
 | `doc_002_field` | «Полевое объяснение» | `bishop_vision` — «Слепая зона» | Да |
-| `doc_002_directive` | «Директива о цвете» | `bishop_vision` — «Слепая зона» | Нет: дублирует улику из `doc_002_field`; рекомендуется прочитать для сюжета |
+| `doc_002_directive` | «Директива о цвете» | `bishop_vision` — «Слепая зона» | Да |
 
-Минимально валидатору достаточно открыть `doc_002_visual` и `doc_002_field`. Источник: `src/content/archive-content.ts`, `case_002` и `archiveDocuments`; проверка — `discoverDocument` и `isCaseReady` в `src/features/archive/archive-engine.ts`.
+Хотя `doc_002_directive` повторно выдаёт `bishop_vision`, новый gate требует открыть все три документа из `case_002.documentIds`. Источник: `src/content/archive-content.ts`, `case_002` и `archiveDocuments`; проверка — `discoverDocument` и `getCaseProgress` в `src/features/archive/archive-engine.ts`.
 
 ### Правильные связи
 
@@ -124,7 +125,7 @@
 
 ### Завершение и награда
 
-После обнаружения трёх улик и подтверждения обеих связей нажать «ЗАВЕРШИТЬ ДЕЛО».
+После открытия трёх документов, обнаружения трёх улик, подтверждения обеих связей и ручного изучения `nico`, `levitate` и `overcompensate` готовность станет `100%`; нажать «ЗАВЕРШИТЬ ДЕЛО».
 
 - завершённое дело: `case_002`;
 - разблокируется: `case_003`;
@@ -175,18 +176,18 @@ ID решения хранится как `caseSolutions.case_003`. Правил
 
 ### Завершение и награда
 
-После открытия трёх документов, подтверждения двух связей и ввода шифра нажать «ЗАВЕРШИТЬ ДЕЛО».
+После открытия трёх документов, подтверждения двух связей, ручного изучения `saturday`, `outside` и `navigating`, а также ввода шифра готовность станет `100%`; нажать «ЗАВЕРШИТЬ ДЕЛО».
 
 - завершённое дело: `case_003`;
 - следующего расследования в текущем массиве `archiveCases` нет;
 - достижение: `perfect_broadcast` — «Идеальный эфир»;
-- появляется предупреждение о назначенной дополнительной аттестации, но сама аттестация откроется только после девяти изученных музыкальных записей.
+- появляется предупреждение о назначенной дополнительной аттестации; поскольку каждое из трёх дел уже потребовало по три музыкальные отметки, аттестация становится доступна сразу после завершения CASE 003.
 
 Источники: `src/features/archive/archive-engine.ts`, `isCaseReady`, `completeCase` и `isAssessmentUnlocked`; `src/features/archive/achievement-engine.ts`, условие `perfect_broadcast`; сообщение UI — `src/features/archive/ArchiveWorkspace.vue`.
 
 ## Девять музыкальных записей
 
-Для допуска к аттестации все девять записей должны иметь `markedAsStudied: true`. Открывать YouTube, Spotify или Яндекс Музыку необязательно: `visitedExternalLink` хранится отдельно и не участвует ни в одном условии. На вкладке «ЗАПИСИ» каждого дела нажать «ОТМЕТИТЬ ИЗУЧЕННОЙ» для всех трёх записей.
+Для закрытия каждого CASE все три закреплённые за ним записи должны иметь `markedAsStudied: true`; таким образом, прохождение трёх дел одновременно выполняет музыкальное условие аттестации. Открывать YouTube, Spotify или Яндекс Музыку необязательно: `visitedExternalLink` хранится отдельно и не участвует ни в одном условии. На вкладке «ЗАПИСИ» каждого дела нажать «ОТМЕТИТЬ ИЗУЧЕННОЙ» для всех трёх записей.
 
 | CASE | MusicRecord ID | Название |
 |---|---|---|
@@ -200,7 +201,7 @@ ID решения хранится как `caseSolutions.case_003`. Правил
 | `case_003` | `outside` | The Outside |
 | `case_003` | `navigating` | Navigating |
 
-После девятой ручной отметки выдаётся достижение `nine_frequencies` — «Девять частот». Источники: `src/content/archive-content.ts`, `archiveMusicRecords` и достижение `nine_frequencies`; `src/features/archive/archive-engine.ts`, `markMusicStudied` и `isAssessmentUnlocked`; `src/features/archive/achievement-engine.ts`, `studiedRecordCount` и условие `nine_frequencies`.
+После девятой ручной отметки выдаётся достижение `nine_frequencies` — «Девять частот». Источники: `src/content/archive-content.ts`, `archiveMusicRecords` и достижение `nine_frequencies`; `src/features/archive/archive-engine.ts`, `getCaseProgress`, `markMusicStudied` и `isAssessmentUnlocked`; `src/features/archive/achievement-engine.ts`, `studiedRecordCount` и условие `nine_frequencies`.
 
 Записи показываются по текущему делу (`caseMusic` в `src/stores/archive.ts`). Чтобы отметить пропущенные записи предыдущего дела, выбрать это уже завершённое дело в левой панели и открыть вкладку «ЗАПИСИ».
 
@@ -296,17 +297,18 @@ ID решения хранится как `caseSolutions.case_003`. Правил
 Общий чек-лист соответствует `isCaseReady` и `completeCase`:
 
 - дело действительно разблокировано и выбрано в левой панели;
-- открыты документы, дающие **все** `evidenceIds` дела;
+- открыты **все** документы из `documentIds` дела, включая документы с дублирующимися уликами;
 - в журнале противоречий присутствуют **все** `requiredConnectionIds`;
+- вручную изучены **все три** записи из `musicRecordIds` дела;
 - для CASE 001 хронология полностью и позиционно совпадает с `correctSequence`;
 - для CASE 003 введена строка, нормализующаяся ровно в `clancyisdead`;
 - после выполнения условий нажата именно кнопка «ЗАВЕРШИТЬ ДЕЛО».
 
 По делам:
 
-- CASE 001: должно быть `4 / 4` улики, `1 / 1` связь и порядок `founding_lineup → salih_departure → dun_arrival → thomas_departure`.
-- CASE 002: должно быть `3 / 3` улики и `2 / 2` связи; хронологии нет.
-- CASE 003: должно быть `3 / 3` улики, `2 / 2` связи и решение `CLANCY IS DEAD`; хронологии нет.
+- CASE 001: `3 / 3` документа, `1 / 1` связь, `3 / 3` записи и порядок `founding_lineup → salih_departure → dun_arrival → thomas_departure`.
+- CASE 002: `3 / 3` документа, `2 / 2` связи и `3 / 3` записи; хронологии и шифра нет.
+- CASE 003: `3 / 3` документа, `2 / 2` связи, `3 / 3` записи и решение `CLANCY IS DEAD`; хронологии нет.
 
 ## Следующее дело закрыто
 
@@ -341,10 +343,10 @@ ID решения хранится как `caseSolutions.case_003`. Правил
 | Этап | Подтверждение |
 |---|---|
 | Вход и ориентация | `ArchiveView.vue`, `ArchiveDialog.vue`, `ArchiveOnboarding.vue`, `completeOnboarding` |
-| Последовательная разблокировка трёх дел | `archiveCases`, `createPlayerProgress`, `completeCase` |
+| Последовательная разблокировка трёх дел | `archiveCases`, `createPlayerProgress`, `getCaseProgress`, `completeCase` |
 | Документы и выдаваемые улики | `archiveDocuments`, `discoverDocument` |
 | Пять правильных связей | `archiveConnections`, `testConnection` |
-| Хронология CASE 001 | `case_001.correctSequence`, `moveTimelineItem`, `isCaseReady` |
+| Хронология CASE 001 | `case_001.correctSequence`, `reorderTimelineItem` (`moveTimelineItem` сохранён для совместимости), `isCaseReady` |
 | Шифр CASE 003 | `doc_003_cipher`, `scaled_anagram`, специальная проверка в `isCaseReady` |
 | Девять музыкальных отметок | `archiveMusicRecords`, `markMusicStudied`, `studiedRecordCount` |
 | Разблокировка и прохождение аттестации | `isAssessmentUnlocked`, `recordAssessmentAnswer`, `completeAssessment` |

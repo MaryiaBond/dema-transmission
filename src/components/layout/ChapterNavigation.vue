@@ -14,7 +14,7 @@ const store = useExperienceStore();
       :key="index"
       class="rail-link"
       :class="{ active: store.currentChapter === index }"
-      :href="`#cycle-${store.currentCycle}-chapter-${index}`"
+      :href="`#chapter-${index}`"
       :data-chapter="index"
       :aria-current="store.currentChapter === index ? 'location' : undefined"
     ><span>{{ String(index).padStart(2, '0') }}</span> {{ chapter }} <i></i></a>

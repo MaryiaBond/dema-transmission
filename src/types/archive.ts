@@ -19,6 +19,7 @@ export type EmployeeStatus = 'appointed' | 'active' | 'under_observation';
 export type ClearanceLevel = 'ARCHIVE ENTRY' | 'UNDER OBSERVATION';
 export type SourceCategory = 'historical_fact' | 'confirmed_canon' | 'game_fiction';
 export type LocalizedArchiveText = Record<LanguageCode, string>;
+export type CaseProgressStatus = 'not_started' | 'in_progress' | 'completed';
 
 export interface SourceReference { label: string; url: string }
 export interface Evidence {
@@ -86,6 +87,25 @@ export interface MusicInvestigation {
   studiedAt: string | null;
 }
 export interface EarnedAchievement { id: AchievementId; earnedAt: string }
+export interface CaseProgressMetric {
+  completed: number;
+  total: number;
+  done: boolean;
+}
+export interface CaseProgressState {
+  caseId: CaseId;
+  documents: CaseProgressMetric;
+  connections: CaseProgressMetric;
+  records: CaseProgressMetric;
+  timeline: boolean | null;
+  cipher: boolean | null;
+  evidenceReady: boolean;
+  completedUnits: number;
+  totalUnits: number;
+  percentage: number;
+  ready: boolean;
+  status: CaseProgressStatus;
+}
 export interface PlayerProgress {
   version: 1;
   playerId: string;
@@ -96,6 +116,7 @@ export interface PlayerProgress {
   currentPhase: ArchivePhase;
   unlockedCases: CaseId[];
   completedCases: CaseId[];
+  studiedDocumentIds: DocumentId[];
   discoveredEvidence: EvidenceId[];
   confirmedConnections: ConnectionId[];
   investigatedMusicRecords: Partial<Record<MusicRecordId, MusicInvestigation>>;

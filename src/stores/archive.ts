@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { archiveCases, archiveMusicRecords, caseById } from '@/content/archive-content';
-import { ARCHIVE_STORAGE_KEY, completeAssessment as finishAssessment, completeCase as fileCase, completeLevel01 as finishLevel01, completeOnboarding as finishOnboarding, createPlayerProgress, discoverDocument as inspectDocument, hasMeaningfulProgress, isAssessmentUnlocked, isCaseReady, markMusicStudied as studyMusic, mergeProgress, moveTimelineItem, recordAssessmentAnswer, recordCaseSolution, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
+import { ARCHIVE_STORAGE_KEY, completeAssessment as finishAssessment, completeCase as fileCase, completeLevel01 as finishLevel01, completeOnboarding as finishOnboarding, createPlayerProgress, discoverDocument as inspectDocument, getCaseProgress, hasMeaningfulProgress, isAssessmentUnlocked, markMusicStudied as studyMusic, mergeProgress, moveTimelineItem, recordAssessmentAnswer, recordCaseSolution, reorderTimelineItem, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
 import { loadLocalProgress, saveLocalProgress } from '@/features/archive/archive-persistence';
 import { archiveSyncConfigured, loadRemoteProgress, saveRemoteProgress } from '@/features/archive/archive-sync';
 import { studiedRecordCount } from '@/features/archive/achievement-engine';
@@ -22,7 +22,9 @@ export const useArchiveStore = defineStore('archive', () => {
   const currentCase = computed(() => caseById[currentCaseId.value]);
   const studiedCount = computed(() => studiedRecordCount(progress.value));
   const assessmentUnlocked = computed(() => isAssessmentUnlocked(progress.value));
-  const currentCaseReady = computed(() => isCaseReady(progress.value, currentCaseId.value));
+  const caseProgressById = computed(() => Object.fromEntries(archiveCases.map((item) => [item.id, getCaseProgress(progress.value, item.id)])) as Record<CaseId, ReturnType<typeof getCaseProgress>>);
+  const currentCaseProgress = computed(() => caseProgressById.value[currentCaseId.value]);
+  const currentCaseReady = computed(() => currentCaseProgress.value.ready);
   const caseMusic = computed(() => archiveMusicRecords.filter((record) => record.caseId === currentCaseId.value));
 
   function initialize(): void {
@@ -101,6 +103,10 @@ export const useArchiveStore = defineStore('archive', () => {
     return outcome.result;
   }
   function moveEvidence(evidenceId: EvidenceId, direction: -1 | 1): void { update(moveTimelineItem(progress.value, currentCaseId.value, evidenceId, direction)); }
+  function moveEvidenceToIndex(evidenceId: EvidenceId, toIndex: number): void {
+    const next = reorderTimelineItem(progress.value, currentCaseId.value, evidenceId, toIndex);
+    if (next !== progress.value) update(next);
+  }
   function setCaseSolution(solution: string): void { update(recordCaseSolution(progress.value, currentCaseId.value, solution)); }
   function completeCase(): boolean {
     const outcome = fileCase(progress.value, currentCaseId.value);
@@ -115,8 +121,8 @@ export const useArchiveStore = defineStore('archive', () => {
   function clearEarnedNotice(): void { earnedNoticeId.value = null; }
 
   return {
-    progress, currentCaseId, currentCase, currentCaseReady, caseMusic, studiedCount, assessmentUnlocked, migrationPending, syncState, earnedNoticeId,
-    initialize, connectCitizen, confirmMigration, setCurrentCase, completeOnboarding, discoverDocument, connectEvidence, moveEvidence, setCaseSolution, completeCase,
+    progress, currentCaseId, currentCase, currentCaseProgress, caseProgressById, currentCaseReady, caseMusic, studiedCount, assessmentUnlocked, migrationPending, syncState, earnedNoticeId,
+    initialize, connectCitizen, confirmMigration, setCurrentCase, completeOnboarding, discoverDocument, connectEvidence, moveEvidence, moveEvidenceToIndex, setCaseSolution, completeCase,
     visitExternalLink, markMusicStudied, answerAssessment, completeAssessment, completeLevel01, clearEarnedNotice, archiveCases
   };
 });

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { archiveCases, archiveConnections, archiveDocuments, archiveMusicRecords, assessmentQuestions, assessmentResult } from '@/content/archive-content';
 import { archiveLocales } from '@/content/archive-locales';
 import { achievementConditions } from '@/features/archive/achievement-engine';
-import { ARCHIVE_STORAGE_KEY, completeAssessment, completeCase, completeLevel01, completeOnboarding, createPlayerProgress, discoverDocument, isAssessmentUnlocked, markMusicStudied, mergeProgress, recordAssessmentAnswer, recordCaseSolution, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
+import { ARCHIVE_STORAGE_KEY, completeAssessment, completeCase, completeLevel01, completeOnboarding, createPlayerProgress, discoverDocument, getCaseProgress, isAssessmentUnlocked, markMusicStudied, mergeProgress, moveTimelineItem, recordAssessmentAnswer, recordCaseSolution, reorderTimelineItem, testConnection, visitMusicLink } from '@/features/archive/archive-engine';
 import { loadLocalProgress, saveLocalProgress } from '@/features/archive/archive-persistence';
 import type { CaseId, PlayerProgress } from '@/types/archive';
 
@@ -15,6 +15,7 @@ function solveCase(progress: PlayerProgress, caseId: CaseId): PlayerProgress {
     const connection = archiveConnections.find((item) => item.id === connectionId)!;
     progress = testConnection(progress, caseId, connection.evidence[0], connection.evidence[1], now).progress;
   }
+  for (const recordId of definition.musicRecordIds) progress = markMusicStudied(progress, recordId, now);
   if (definition.correctSequence) progress = { ...progress, caseSequences: { ...progress.caseSequences, [caseId]: [...definition.correctSequence] } };
   if (caseId === 'case_003') progress = recordCaseSolution(progress, caseId, 'CLANCY IS DEAD', now);
   return completeCase(progress, caseId, now).progress;
@@ -29,7 +30,7 @@ function unlockAssessment(progress = createPlayerProgress('guest-test', now)): P
 describe('DEMA Archive engine', () => {
   beforeEach(() => localStorage.clear());
 
-  it.each(archiveCases.map((item) => item.id))('completes %s only with its required evidence', (caseId) => {
+  it.each(archiveCases.map((item) => item.id))('completes %s only after every verification stage', (caseId) => {
     let empty = createPlayerProgress('archivist', now);
     expect(completeCase(empty, caseId, now).completed).toBe(false);
     for (const item of archiveCases) {
@@ -38,6 +39,37 @@ describe('DEMA Archive engine', () => {
     }
     const solved = solveCase(empty, caseId);
     expect(solved.completedCases).toContain(caseId);
+  });
+
+  it('reports explicit document, connection, record, timeline, and cipher progress', () => {
+    let progress = createPlayerProgress('progress-check', now);
+    expect(getCaseProgress(progress, 'case_001')).toMatchObject({
+      documents: { completed: 0, total: 3, done: false },
+      connections: { completed: 0, total: 1, done: false },
+      records: { completed: 0, total: 3, done: false },
+      timeline: false,
+      cipher: null,
+      ready: false,
+      status: 'not_started'
+    });
+    for (const documentId of archiveCases[0]!.documentIds.slice(0, 2)) progress = discoverDocument(progress, documentId, now);
+    const connection = archiveConnections.find((item) => item.id === 'lineup_transition')!;
+    progress = testConnection(progress, 'case_001', connection.evidence[0], connection.evidence[1], now).progress;
+    progress = { ...progress, caseSequences: { case_001: [...archiveCases[0]!.correctSequence!] } };
+    expect(getCaseProgress(progress, 'case_001')).toMatchObject({ documents: { completed: 2, done: false }, connections: { done: true }, records: { done: false }, timeline: true, ready: false });
+    progress = discoverDocument(progress, archiveCases[0]!.documentIds[2]!, now);
+    for (const recordId of archiveCases[0]!.musicRecordIds) progress = markMusicStudied(progress, recordId, now);
+    expect(getCaseProgress(progress, 'case_001')).toMatchObject({ documents: { done: true }, records: { done: true }, percentage: 100, ready: true, status: 'in_progress' });
+  });
+
+  it('reorders timeline items to any index while preserving the adjacent-move API', () => {
+    const fresh = createPlayerProgress('timeline-test', now);
+    const initial = [...fresh.caseSequences.case_001!];
+    const movedToEnd = reorderTimelineItem(fresh, 'case_001', initial[0]!, 3, now);
+    expect(movedToEnd.caseSequences.case_001).toEqual([initial[1], initial[2], initial[3], initial[0]]);
+    const movedAdjacent = moveTimelineItem(movedToEnd, 'case_001', initial[0]!, -1, now);
+    expect(movedAdjacent.caseSequences.case_001).toEqual([initial[1], initial[2], initial[0], initial[3]]);
+    expect(reorderTimelineItem(movedAdjacent, 'case_001', initial[0]!, 2, now)).toBe(movedAdjacent);
   });
 
   it('creates EMPLOYEE 021 once and records the first orientation', () => {
@@ -80,13 +112,11 @@ describe('DEMA Archive engine', () => {
     expect(twice.achievements.filter((item) => item.id === 'archive_corrected')).toHaveLength(1);
   });
 
-  it('unlocks assessment only after three cases and nine manual study marks', () => {
+  it('unlocks assessment after three cases because each case requires its three study marks', () => {
     let progress = createPlayerProgress('candidate', now);
     for (const item of archiveCases) progress = solveCase(progress, item.id);
-    for (const record of archiveMusicRecords.slice(0, 8)) progress = markMusicStudied(progress, record.id, now);
-    expect(isAssessmentUnlocked(progress)).toBe(false);
-    progress = markMusicStudied(progress, archiveMusicRecords[8]!.id, now);
     expect(isAssessmentUnlocked(progress)).toBe(true);
+    expect(Object.values(progress.investigatedMusicRecords).filter((record) => record?.markedAsStudied)).toHaveLength(9);
     expect(achievementConditions(progress).nine_frequencies).toBe(true);
   });
 

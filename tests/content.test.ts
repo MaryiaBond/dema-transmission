@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chapters } from '@/content/chapters';
 import { glossaryIds } from '@/content/glossary';
 import { localeContent, supportedLanguages } from '@/content/locales';
+import { musicResources, storyVideos } from '@/content/music';
 
 describe('localized content', () => {
   it('contains four complete dictionaries with matching structures', () => {
@@ -39,5 +40,13 @@ describe('localized content', () => {
       else if (value && typeof value === 'object') Object.values(value).forEach(visit);
     };
     supportedLanguages.forEach((language) => visit(localeContent[language]));
+  });
+
+  it('keeps every music destination on the expected external service', () => {
+    for (const release of Object.values(musicResources)) {
+      expect(release.spotify).toMatch(/^https:\/\/open\.spotify\.com\/album\//);
+      expect(release.yandex).toMatch(/^https:\/\/music\.yandex\.ru\/album\//);
+    }
+    for (const media of Object.values(storyVideos)) expect(media.youtube).toMatch(/^https:\/\/www\.youtube\.com\/watch\?v=/);
   });
 });

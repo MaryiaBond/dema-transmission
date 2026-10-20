@@ -1,6 +1,6 @@
 import { archiveCases, archiveConnections, assessmentQuestions, caseById, documentById } from '@/content/archive-content';
 import { registerAchievements, studiedRecordCount } from './achievement-engine';
-import type { AssessmentAnswerId, AssessmentQuestionId, CaseId, DocumentId, EvidenceId, MusicRecordId, PlayerProgress } from '@/types/archive';
+import type { AssessmentAnswerId, AssessmentQuestionId, CaseId, CaseProgressMetric, CaseProgressState, DocumentId, EvidenceId, MusicRecordId, PlayerProgress } from '@/types/archive';
 
 export const ARCHIVE_STORAGE_KEY = 'the-outside-archive-progress-v1';
 
@@ -10,7 +10,7 @@ const stamp = (progress: PlayerProgress, now: string): PlayerProgress => registe
 export function createPlayerProgress(playerId: string, now = new Date().toISOString()): PlayerProgress {
   return {
     version: 1, playerId, employeeId: 'EMPLOYEE 021', employeeStatus: 'appointed', firstEnteredAt: now, onboardingCompletedAt: null,
-    currentPhase: 'phase_a', unlockedCases: ['case_001'], completedCases: [], discoveredEvidence: [], confirmedConnections: [],
+    currentPhase: 'phase_a', unlockedCases: ['case_001'], completedCases: [], studiedDocumentIds: [], discoveredEvidence: [], confirmedConnections: [],
     investigatedMusicRecords: {}, achievements: [], assessmentAnswers: {}, assessmentCompletedAt: null,
     level01CompletedAt: null, clearanceLevel: 'ARCHIVE ENTRY', caseSolutions: {},
     caseSequences: Object.fromEntries(archiveCases.filter((item) => item.initialSequence).map((item) => [item.id, [...item.initialSequence!]])), updatedAt: now
@@ -24,7 +24,11 @@ export function completeOnboarding(progress: PlayerProgress, now = new Date().to
 
 export function discoverDocument(progress: PlayerProgress, documentId: DocumentId, now = new Date().toISOString()): PlayerProgress {
   const document = documentById[documentId];
-  return stamp({ ...progress, discoveredEvidence: unique([...progress.discoveredEvidence, ...document.evidenceIds]) }, now);
+  return stamp({
+    ...progress,
+    studiedDocumentIds: unique([...(progress.studiedDocumentIds ?? []), documentId]),
+    discoveredEvidence: unique([...progress.discoveredEvidence, ...document.evidenceIds])
+  }, now);
 }
 
 export function testConnection(progress: PlayerProgress, caseId: CaseId, first: EvidenceId, second: EvidenceId, now = new Date().toISOString()): { progress: PlayerProgress; result: 'correct' | 'known' | 'wrong' } {
@@ -34,22 +38,62 @@ export function testConnection(progress: PlayerProgress, caseId: CaseId, first: 
   return { progress: stamp({ ...progress, confirmedConnections: [...progress.confirmedConnections, match.id] }, now), result: 'correct' };
 }
 
-export function moveTimelineItem(progress: PlayerProgress, caseId: CaseId, evidenceId: EvidenceId, direction: -1 | 1, now = new Date().toISOString()): PlayerProgress {
+export function reorderTimelineItem(progress: PlayerProgress, caseId: CaseId, evidenceId: EvidenceId, toIndex: number, now = new Date().toISOString()): PlayerProgress {
   const sequence = [...(progress.caseSequences[caseId] ?? caseById[caseId].initialSequence ?? [])];
   const from = sequence.indexOf(evidenceId);
-  const to = from + direction;
-  if (from < 0 || to < 0 || to >= sequence.length) return progress;
-  [sequence[from], sequence[to]] = [sequence[to]!, sequence[from]!];
+  const to = Math.min(Math.max(Math.trunc(toIndex), 0), sequence.length - 1);
+  if (from < 0 || from === to || sequence.length < 2) return progress;
+  const [moved] = sequence.splice(from, 1);
+  sequence.splice(to, 0, moved!);
   return stamp({ ...progress, caseSequences: { ...progress.caseSequences, [caseId]: sequence } }, now);
 }
 
-export function isCaseReady(progress: PlayerProgress, caseId: CaseId): boolean {
+export function moveTimelineItem(progress: PlayerProgress, caseId: CaseId, evidenceId: EvidenceId, direction: -1 | 1, now = new Date().toISOString()): PlayerProgress {
+  const sequence = progress.caseSequences[caseId] ?? caseById[caseId].initialSequence ?? [];
+  const from = sequence.indexOf(evidenceId);
+  if (from < 0) return progress;
+  return reorderTimelineItem(progress, caseId, evidenceId, from + direction, now);
+}
+
+const metric = (completed: number, total: number): CaseProgressMetric => ({ completed, total, done: completed >= total });
+
+export function getCaseProgress(progress: PlayerProgress, caseId: CaseId): CaseProgressState {
   const current = caseById[caseId];
+  const studiedDocumentIds = progress.studiedDocumentIds ?? [];
+  const documents = metric(current.documentIds.filter((id) => studiedDocumentIds.includes(id)).length, current.documentIds.length);
+  const connections = metric(current.requiredConnectionIds.filter((id) => progress.confirmedConnections.includes(id)).length, current.requiredConnectionIds.length);
+  const records = metric(current.musicRecordIds.filter((id) => progress.investigatedMusicRecords[id]?.markedAsStudied).length, current.musicRecordIds.length);
   const evidenceReady = current.evidenceIds.every((id) => progress.discoveredEvidence.includes(id));
-  const connectionsReady = current.requiredConnectionIds.every((id) => progress.confirmedConnections.includes(id));
-  const sequenceReady = !current.correctSequence || current.correctSequence.every((id, index) => progress.caseSequences[caseId]?.[index] === id);
-  const solutionReady = caseId !== 'case_003' || progress.caseSolutions.case_003?.replace(/[^a-z]/gi, '').toLowerCase() === 'clancyisdead';
-  return evidenceReady && connectionsReady && sequenceReady && solutionReady;
+  const timeline = current.correctSequence ? current.correctSequence.every((id, index) => progress.caseSequences[caseId]?.[index] === id) : null;
+  const cipher = caseId === 'case_003' ? progress.caseSolutions.case_003?.replace(/[^a-z]/gi, '').toLowerCase() === 'clancyisdead' : null;
+  const binaryChecks = [timeline, cipher].filter((value): value is boolean => value !== null);
+  const completedUnits = documents.completed + connections.completed + records.completed + binaryChecks.filter(Boolean).length;
+  const totalUnits = documents.total + connections.total + records.total + binaryChecks.length;
+  const ready = documents.done && connections.done && records.done && evidenceReady && timeline !== false && cipher !== false;
+  const completed = progress.completedCases.includes(caseId);
+  const initialSequence = current.initialSequence ?? [];
+  const sequence = progress.caseSequences[caseId] ?? [];
+  const timelineChanged = initialSequence.length > 0 && initialSequence.some((id, index) => sequence[index] !== id);
+  const started = completedUnits > 0 || timelineChanged || Boolean(progress.caseSolutions[caseId]);
+
+  return {
+    caseId,
+    documents,
+    connections,
+    records,
+    timeline,
+    cipher,
+    evidenceReady,
+    completedUnits,
+    totalUnits,
+    percentage: totalUnits ? Math.round((completedUnits / totalUnits) * 100) : 100,
+    ready,
+    status: completed ? 'completed' : started ? 'in_progress' : 'not_started'
+  };
+}
+
+export function isCaseReady(progress: PlayerProgress, caseId: CaseId): boolean {
+  return getCaseProgress(progress, caseId).ready;
 }
 
 export function recordCaseSolution(progress: PlayerProgress, caseId: CaseId, solution: string, now = new Date().toISOString()): PlayerProgress {
@@ -121,6 +165,7 @@ export function mergeProgress(local: PlayerProgress, remote: PlayerProgress): Pl
     ...newer,
     playerId: remote.playerId,
     unlockedCases: unique([...remote.unlockedCases, ...local.unlockedCases]), completedCases: unique([...remote.completedCases, ...local.completedCases]),
+    studiedDocumentIds: unique([...(remote.studiedDocumentIds ?? []), ...(local.studiedDocumentIds ?? [])]),
     discoveredEvidence: unique([...remote.discoveredEvidence, ...local.discoveredEvidence]), confirmedConnections: unique([...remote.confirmedConnections, ...local.confirmedConnections]),
     investigatedMusicRecords: music,
     achievements: Object.values(Object.fromEntries([...remote.achievements, ...local.achievements].map((item) => [item.id, item]))),

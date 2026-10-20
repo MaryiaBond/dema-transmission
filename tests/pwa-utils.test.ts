@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installPromptDismissed, isIosSafari, isStandaloneDisplay, rememberInstallDismissal } from '@/features/pwa/pwa-utils';
+import { installGuide, isIosSafari, isStandaloneDisplay } from '@/features/pwa/pwa-utils';
 
 describe('PWA install behavior', () => {
   beforeEach(() => {
@@ -9,12 +9,6 @@ describe('PWA install behavior', () => {
     Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
     Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 0 });
     Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 Chrome/140 Safari/537.36' });
-  });
-
-  it('remembers a dismissed prompt without depending on authentication', () => {
-    expect(installPromptDismissed()).toBe(false);
-    rememberInstallDismissal();
-    expect(installPromptDismissed()).toBe(true);
   });
 
   it('recognizes installed display mode', () => {
@@ -28,5 +22,14 @@ describe('PWA install behavior', () => {
     expect(isIosSafari()).toBe(true);
     Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 CriOS/140 Mobile/15E148 Safari/604.1' });
     expect(isIosSafari()).toBe(false);
+  });
+
+  it('selects browser-specific fallback installation guidance', () => {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 Firefox/140' });
+    expect(installGuide()).toBe('firefox');
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 Version/18.0 Safari/605.1.15' });
+    expect(installGuide()).toBe('safari');
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 Chrome/140 Safari/537.36' });
+    expect(installGuide()).toBe('generic');
   });
 });

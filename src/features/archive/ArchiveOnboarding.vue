@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import AtmosphereImage from './AtmosphereImage.vue';
+import { demaAssets } from './dema-assets';
 import { archiveLocales } from '@/content/archive-locales';
 import { useExperienceStore } from '@/stores/experience';
 
@@ -13,6 +15,22 @@ const step = ref(0);
 <template>
   <section class="archive-onboarding" data-testid="archive-onboarding">
     <div class="onboarding-seal" aria-hidden="true">021</div>
+    <AtmosphereImage
+      class="onboarding-atmosphere"
+      :src="demaAssets.archiveHero.src"
+      alt=""
+      label="EMPLOYEE 021 // ARCHIVE INTAKE"
+      eager
+      decorative
+      :fit="demaAssets.archiveHero.fit"
+      :position="demaAssets.archiveHero.position"
+      :mobile-position="demaAssets.archiveHero.mobilePosition"
+      :width="demaAssets.archiveHero.width"
+      :height="demaAssets.archiveHero.height"
+      :aspect-ratio="demaAssets.archiveHero.aspectRatio"
+      :overlay="demaAssets.archiveHero.overlay"
+      sizes="100vw"
+    />
     <div class="onboarding-terminal">
       <span>D//CENTRAL ARCHIVE // INTAKE</span>
       <template v-if="step === 0">

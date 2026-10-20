@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import AtmosphereImage from './AtmosphereImage.vue';
+import { demaAssets } from './dema-assets';
 import { archiveLocales } from '@/content/archive-locales';
 import { useExperienceStore } from '@/stores/experience';
 
@@ -12,6 +14,20 @@ const stage = ref<'complete' | 'future'>('complete');
 <template>
   <section class="level-complete-scene" data-testid="level-complete-scene">
     <div class="level-static" aria-hidden="true"></div>
+    <AtmosphereImage
+      class="level-complete-image"
+      :src="demaAssets.level01Complete.src"
+      alt=""
+      decorative
+      :fit="demaAssets.level01Complete.fit"
+      :position="demaAssets.level01Complete.position"
+      :mobile-position="demaAssets.level01Complete.mobilePosition"
+      :width="demaAssets.level01Complete.width"
+      :height="demaAssets.level01Complete.height"
+      :aspect-ratio="demaAssets.level01Complete.aspectRatio"
+      :overlay="demaAssets.level01Complete.overlay"
+      sizes="(max-width: 768px) calc(100vw - 30px), 52vw"
+    />
     <div v-if="stage === 'complete'" class="level-complete-record">
       <span>D//LEVEL-CLEARANCE-01</span><h1>{{ ui.levelComplete }}</h1><p>{{ ui.levelCompleteCopy }}</p>
       <div><small>{{ ui.newClearance }}</small><strong>UNDER OBSERVATION</strong></div>

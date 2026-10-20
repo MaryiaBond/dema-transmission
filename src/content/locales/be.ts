@@ -2038,7 +2038,7 @@ const be = {
           "type": "element",
           "tag": "a",
           "attrs": {
-            "href": "#cycle-finale"
+            "href": "#watchlist"
           },
           "children": [
             {

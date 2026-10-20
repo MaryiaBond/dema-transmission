@@ -26,7 +26,7 @@ export default defineConfig({
       cleanupOutdatedCaches: true,
       navigateFallback: 'index.html',
       globPatterns: ['**/*.{js,css,html,svg,png,webp,jpg,jpeg,woff,woff2}'],
-      globIgnores: ['icons/pwa-*.png'],
+      globIgnores: ['icons/pwa-*.png', 'assets/dema/*.png'],
       runtimeCaching: [
         { urlPattern: /^https:\/\/[^/]+\.supabase\.co\//i, handler: 'NetworkOnly' },
         { urlPattern: /^https:\/\/(?:accounts|api|open)\.spotify\.com\//i, handler: 'NetworkOnly' },
@@ -42,6 +42,14 @@ export default defineConfig({
           options: {
             cacheName: 'the-outside-font-files',
             expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 365 }
+          }
+        },
+        {
+          urlPattern: ({ request, url }) => request.destination === 'image' && url.origin === self.location.origin && url.pathname.includes('/assets/dema/'),
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'the-outside-dema-visuals',
+            expiration: { maxEntries: 15, maxAgeSeconds: 60 * 60 * 24 * 30 }
           }
         },
         { urlPattern: ({ request, url }) => request.destination === 'image' && url.origin !== self.location.origin, handler: 'NetworkOnly' }

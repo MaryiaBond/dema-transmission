@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import HeroSection from '@/components/layout/HeroSection.vue';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher.vue';
@@ -12,7 +12,6 @@ import ArchiveView from '@/features/archive/ArchiveView.vue';
 import CitizenInvitation from '@/components/citizenship/CitizenInvitation.vue';
 import PwaPrompts from '@/features/pwa/PwaPrompts.vue';
 import { getLocaleContent } from '@/content/locales';
-import { CYCLE_LIMIT } from '@/features/story-cycle/cycle-engine';
 import { useExperienceStore } from '@/stores/experience';
 import { useCitizenshipStore } from '@/stores/citizenship';
 import type { GlossaryId } from '@/types/content';
@@ -27,13 +26,6 @@ const archiveOpen = ref(false);
 const glossaryOpen = ref(false);
 const currentTerm = ref<GlossaryId | null>(null);
 let revealObserver: IntersectionObserver | null = null;
-const checkDate = () => { store.resetForNewDay(); };
-
-const cycleText = computed(() => {
-  const current = String(store.endingUnlocked ? CYCLE_LIMIT : store.currentCycle).padStart(3, '0');
-  return getLocaleContent(store.selectedLanguage).cycle.counter.replace('{current}', current);
-});
-const cycleAria = computed(() => getLocaleContent(store.selectedLanguage).cycle.counterAria.replace('{current}', String(store.currentCycle)));
 
 function syncScroll(): void {
   const y = window.scrollY;
@@ -71,16 +63,12 @@ watch(() => store.selectedLanguage, async (language) => {
 onMounted(() => {
   void citizenship.initialize();
   window.addEventListener('scroll', syncScroll, { passive: true });
-  window.addEventListener('focus', checkDate);
-  document.addEventListener('visibilitychange', checkDate);
   syncScroll();
   setupRevealObserver();
 });
 onBeforeUnmount(() => {
   citizenship.dispose();
   window.removeEventListener('scroll', syncScroll);
-  window.removeEventListener('focus', checkDate);
-  document.removeEventListener('visibilitychange', checkDate);
   revealObserver?.disconnect();
 });
 </script>
@@ -88,19 +76,18 @@ onBeforeUnmount(() => {
 <template>
   <div class="read-progress" aria-hidden="true"><span :style="{ transform: `scaleX(${progress})` }"></span></div>
   <div class="grain" aria-hidden="true"></div>
-  <a class="skip-link" :href="`#cycle-${store.currentCycle}-chapter-0`">{{ t('ui.skip') }}</a>
+  <a class="skip-link" href="#chapter-0">{{ t('ui.skip') }}</a>
   <SiteHeader :scrolled="scrolled" @open-archive="archiveOpen = true" />
   <LanguageSwitcher />
-  <div class="cycle-indicator" :class="{ 'is-terminal': store.endingUnlocked }" role="status" aria-live="polite" :aria-label="cycleAria"><span class="cycle-indicator-signal" aria-hidden="true"></span><span>{{ cycleText }}</span></div>
   <main id="top">
     <HeroSection />
     <StoryReader @term="openTerm" />
     <WatchlistSection />
     <ArchiveView @open="archiveOpen = true" />
     <CitizenInvitation />
+    <PwaPrompts />
   </main>
   <SiteFooter />
   <StoryGlossary :open="glossaryOpen" :term="currentTerm" @close="glossaryOpen = false" />
   <ArchiveDialog v-if="archiveOpen" :open="archiveOpen" @close="archiveOpen = false" />
-  <PwaPrompts />
 </template>
