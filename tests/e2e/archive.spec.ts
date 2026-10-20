@@ -24,7 +24,7 @@ async function openArchive(page: import('@playwright/test').Page) {
   await page.locator('#archiveInvite .action-primary').click();
   await expect(page.getByTestId('archive-workspace')).toBeVisible();
   if (await page.getByTestId('archive-onboarding').isVisible()) {
-    await expect(page.getByTestId('archive-onboarding')).toContainText('Central Archive');
+    await expect(page.getByTestId('archive-onboarding')).toContainText('D//CENTRAL ARCHIVE');
     await page.getByTestId('archive-onboarding').getByRole('button').click();
     await expect(page.getByTestId('archive-onboarding')).toContainText('EMPLOYEE 021');
     await page.getByTestId('archive-onboarding').getByRole('button').click();
@@ -54,7 +54,7 @@ test('enters the archive, solves CASE 001, and earns its achievement', async ({ 
   await timeline.nth(3).getByRole('button', { name: /Move earlier/ }).click();
   await timeline.nth(2).getByRole('button', { name: /Move earlier/ }).click();
   await page.getByRole('button', { name: 'FILE CASE' }).click();
-  await expect(page.locator('.archive-case-footer')).toContainText('Case entered');
+  await expect(page.locator('.archive-case-footer')).toContainText('ARCHIVE CORRECTED');
 
   await page.locator('.archive-tabs button').filter({ hasText: 'CREDENTIAL' }).click();
   await expect(page.getByTestId('achievement-passport').locator('article.earned')).toContainText('Archive Corrected');
@@ -80,6 +80,17 @@ test('opens and completes the cinematic compliance assessment from a test fixtur
     await page.locator('.compliance-question>button').click();
   }
   await expect(page.locator('.compliance-result')).toContainText('SUITABLE FOR CONTINUED OBSERVATION');
+  await page.locator('.compliance-result').getByRole('button', { name: 'CONTINUE' }).click();
+  await expect(page.getByTestId('level-complete-scene')).toContainText('LEVEL 01 COMPLETE');
+  await page.getByRole('button', { name: 'ACCEPT CLEARANCE' }).click();
+  await expect(page.getByTestId('level-complete-scene')).toContainText('💩 🦄');
+  await page.getByRole('button', { name: 'REVIEW ACHIEVEMENTS' }).click();
+  await expect(page.getByTestId('classified-personnel-note')).toContainText('Employee No. 021 demonstrated independent thought');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+  await page.locator('.archive-tabs button').filter({ hasText: 'CREDENTIAL' }).click();
+  await expect(page.getByTestId('classified-personnel-note')).toContainText('CLASSIFIED');
 });
 
 test('renders the archive in all four explicit languages without horizontal page overflow', async ({ page }) => {

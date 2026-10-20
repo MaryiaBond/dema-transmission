@@ -117,7 +117,8 @@ describe('DEMA Archive engine', () => {
 
   it('merges guest progress into a citizen copy without losing the local achievements', () => {
     const local = solveCase(createPlayerProgress('guest', now), 'case_001');
-    const remote = solveCase(createPlayerProgress('citizen-id', '2026-10-18T12:00:00.000Z'), 'case_002');
+    const remoteAfterFirst = solveCase(createPlayerProgress('citizen-id', '2026-10-18T12:00:00.000Z'), 'case_001');
+    const remote = solveCase(remoteAfterFirst, 'case_002');
     const merged = mergeProgress(local, remote);
     expect(merged.playerId).toBe('citizen-id');
     expect(merged.completedCases).toEqual(expect.arrayContaining(['case_001', 'case_002']));

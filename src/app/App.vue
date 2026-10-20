@@ -10,6 +10,7 @@ import StoryReader from '@/components/story/StoryReader.vue';
 import WatchlistSection from '@/components/story/WatchlistSection.vue';
 import ArchiveView from '@/features/archive/ArchiveView.vue';
 import CitizenInvitation from '@/components/citizenship/CitizenInvitation.vue';
+import PwaPrompts from '@/features/pwa/PwaPrompts.vue';
 import { getLocaleContent } from '@/content/locales';
 import { CYCLE_LIMIT } from '@/features/story-cycle/cycle-engine';
 import { useExperienceStore } from '@/stores/experience';
@@ -101,4 +102,5 @@ onBeforeUnmount(() => {
   <SiteFooter />
   <StoryGlossary :open="glossaryOpen" :term="currentTerm" @close="glossaryOpen = false" />
   <ArchiveDialog v-if="archiveOpen" :open="archiveOpen" @close="archiveOpen = false" />
+  <PwaPrompts />
 </template>
