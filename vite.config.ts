@@ -14,11 +14,11 @@ export default defineConfig({
       start_url: '/',
       scope: '/',
       display: 'standalone',
-      theme_color: '#10130f',
-      background_color: '#090c0b',
+      theme_color: '#101210',
+      background_color: '#101210',
       icons: [
-        { src: '/icons/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-        { src: '/icons/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/icons/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         { src: '/icons/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     },

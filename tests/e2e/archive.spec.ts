@@ -79,7 +79,7 @@ async function mouseDragTimeline(page: Page, fromIndex: number, toIndex: number)
 async function touchDragTimeline(page: Page, fromIndex: number, toIndex: number): Promise<void> {
   const cards = page.getByTestId('timeline-board').locator('.timeline-card');
   await page.getByTestId('timeline-board').locator('.timeline-sortable').scrollIntoViewIfNeeded();
-  if (toIndex === 0) await page.locator('.archive-main').evaluate((element) => { element.scrollTop = Math.max(0, element.scrollTop - 90); });
+  if (toIndex === 0) await page.locator('.archive-shell').evaluate((element) => { element.scrollTop = Math.max(0, element.scrollTop - 90); });
   const source = await cards.nth(fromIndex).locator('.timeline-drag-handle').boundingBox();
   const target = await cards.nth(toIndex).boundingBox();
   if (!source || !target) throw new Error('Timeline touch target is outside the viewport');
@@ -238,7 +238,7 @@ test('keeps touch scrolling available outside the timeline handle', async ({ pag
   await card.scrollIntoViewIfNeeded();
   const event = await card.locator('.timeline-event').boundingBox();
   if (!event) throw new Error('Timeline event is outside the viewport');
-  const before = await page.locator('.archive-main').evaluate((element) => element.scrollTop);
+  const before = await page.locator('.archive-shell').evaluate((element) => element.scrollTop);
   const client = await page.context().newCDPSession(page);
   const x = event.x + event.width / 2;
   const startY = event.y + event.height / 2;
@@ -246,8 +246,83 @@ test('keeps touch scrolling available outside the timeline handle', async ({ pag
   await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY - 90, radiusX: 8, radiusY: 8, force: 1 }] });
   await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await client.detach();
-  await expect.poll(() => page.locator('.archive-main').evaluate((element) => element.scrollTop)).toBeGreaterThan(before);
+  await expect.poll(() => page.locator('.archive-shell').evaluate((element) => element.scrollTop)).toBeGreaterThan(before);
   await expect.poll(() => timelineIds(page)).toEqual(['dun_arrival', 'founding_lineup', 'thomas_departure', 'salih_departure']);
+});
+
+test('keeps the mobile case carousel in the shared scroll flow with one sticky navigation layer', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'desktop', 'Mobile archive scrolling is covered by mobile projects.');
+  await page.evaluate((fixture) => localStorage.setItem('the-outside-archive-progress-v1', JSON.stringify(fixture)), completeFixture);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openArchive(page);
+
+  const shell = page.locator('.archive-shell');
+  const rail = page.locator('.archive-case-rail');
+  const main = page.locator('.archive-main');
+  const tabs = page.locator('.archive-tabs');
+  const progress = page.getByTestId('case-progress-checklist');
+  await expect(rail).toBeInViewport();
+  expect(await shell.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto');
+  expect(await main.evaluate((element) => getComputedStyle(element).overflowY)).toBe('visible');
+  expect(await rail.evaluate((element) => getComputedStyle(element).position)).toBe('static');
+  expect(await tabs.evaluate((element) => getComputedStyle(element).position)).toBe('sticky');
+  expect(await progress.evaluate((element) => getComputedStyle(element).position)).toBe('static');
+
+  const railBox = await rail.boundingBox();
+  if (!railBox) throw new Error('Case carousel is outside the viewport');
+  const client = await page.context().newCDPSession(page);
+  const y = railBox.y + railBox.height / 2;
+  const startX = railBox.x + railBox.width * 0.78;
+  const endX = railBox.x + railBox.width * 0.22;
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y, radiusX: 8, radiusY: 8, force: 1 }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: endX, y, radiusX: 8, radiusY: 8, force: 1 }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await client.detach();
+  await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+
+  await shell.evaluate((element) => element.scrollTo({ top: 720 }));
+  await expect.poll(() => shell.evaluate((element) => element.scrollTop)).toBeGreaterThan(500);
+  await expect(rail).not.toBeInViewport();
+  await expect(tabs).toBeInViewport();
+  const systemBox = await page.locator('.archive-system-bar').boundingBox();
+  const tabsBox = await tabs.boundingBox();
+  if (!systemBox || !tabsBox) throw new Error('Archive navigation is outside the viewport');
+  expect(tabsBox.y).toBeGreaterThanOrEqual(systemBox.y + systemBox.height - 1);
+
+  const scrollBeforeTabChange = await shell.evaluate((element) => element.scrollTop);
+  await tabs.getByRole('button', { name: 'BOARD' }).click();
+  await expect(page.getByTestId('investigation-board')).toBeVisible();
+  expect(Math.abs(await shell.evaluate((element) => element.scrollTop) - scrollBeforeTabChange)).toBeLessThanOrEqual(2);
+  const firstEvidence = page.locator('.evidence-card').first();
+  await firstEvidence.scrollIntoViewIfNeeded();
+  await expect(firstEvidence).toBeInViewport();
+  const evidenceBox = await firstEvidence.boundingBox();
+  const stickyTabsBox = await tabs.boundingBox();
+  if (!evidenceBox || !stickyTabsBox) throw new Error('Board content is outside the viewport');
+  expect(evidenceBox.y).toBeGreaterThanOrEqual(stickyTabsBox.y + stickyTabsBox.height - 1);
+
+  await shell.evaluate((element) => element.scrollTo({ top: 0 }));
+  await expect.poll(() => shell.evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(rail).toBeInViewport();
+  await rail.getByRole('button', { name: /CASE 002/ }).click();
+  await expect(page.locator('.archive-case-heading')).toContainText('CASE 002');
+  await expect(rail).toBeInViewport();
+  const railAfterCaseChange = await rail.boundingBox();
+  const mainAfterCaseChange = await main.boundingBox();
+  if (!railAfterCaseChange || !mainAfterCaseChange) throw new Error('Archive flow is outside the viewport');
+  expect(Math.abs(mainAfterCaseChange.y - (railAfterCaseChange.y + railAfterCaseChange.height))).toBeLessThanOrEqual(2);
+  expect(await shell.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+});
+
+test('preserves the desktop archive split layout', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop layout is covered by the desktop project.');
+  await openArchive(page);
+  const shell = page.locator('.archive-shell');
+  const main = page.locator('.archive-main');
+  const columns = await shell.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  expect(columns).toBe(2);
+  expect(await shell.evaluate((element) => getComputedStyle(element).overflowY)).not.toBe('auto');
+  expect(await main.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto');
 });
 
 test('enters the archive, solves CASE 001, and earns its achievement', async ({ page }, testInfo) => {

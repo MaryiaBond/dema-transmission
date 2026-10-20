@@ -1,17 +1,23 @@
 import { expect, test } from '@playwright/test';
 
-test('ships an installable manifest and registers the service worker', async ({ page }) => {
+test('ships the approved app icons in the document and installable manifest', async ({ page, request }) => {
   await page.goto('/?lang=en', { waitUntil: 'domcontentloaded' });
   const manifest = await page.evaluate(async () => {
     const href = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.href;
     return href ? await fetch(href).then((response) => response.json()) : null;
   });
-  expect(manifest).toMatchObject({ name: 'THE OUTSIDE', short_name: 'THE OUTSIDE', start_url: '/', scope: '/', display: 'standalone' });
+  expect(manifest).toMatchObject({ name: 'THE OUTSIDE', short_name: 'THE OUTSIDE', start_url: '/', scope: '/', display: 'standalone', theme_color: '#101210', background_color: '#101210' });
   expect(manifest.icons).toEqual(expect.arrayContaining([
-    expect.objectContaining({ sizes: '192x192' }),
-    expect.objectContaining({ sizes: '512x512' }),
-    expect.objectContaining({ purpose: 'maskable' })
+    expect.objectContaining({ src: '/icons/pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }),
+    expect.objectContaining({ src: '/icons/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }),
+    expect.objectContaining({ src: '/icons/pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' })
   ]));
+  await expect(page.locator('link[rel="icon"][href="/favicon.ico"]')).toHaveAttribute('sizes', '16x16 32x32 48x48');
+  await expect(page.locator('link[rel="icon"][href="/icons/favicon-32x32.png"]')).toHaveAttribute('sizes', '32x32');
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/icons/apple-touch-icon.png');
+  for (const icon of ['/favicon.ico', '/icons/favicon-32x32.png', '/icons/apple-touch-icon.png', ...manifest.icons.map((item: { src: string }) => item.src)]) {
+    expect((await request.get(icon)).status(), icon).toBe(200);
+  }
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.ready.then((registration) => registration.active?.state))).toBe('activated');
 });
 

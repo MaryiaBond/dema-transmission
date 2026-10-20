@@ -32,21 +32,21 @@
   .archive-workspace{background:linear-gradient(180deg,#111611,#080b09 62%)}
   .archive-system-bar{min-height:calc(58px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 58px 0 15px;background:#090c0bf5;backdrop-filter:blur(14px)}
   .archive-system-bar .dialog-close{top:calc(9px + env(safe-area-inset-top));right:10px;width:40px;height:40px}
-  .archive-shell{display:flex;flex-direction:column;overflow:hidden}
-  .archive-case-rail{flex:none;display:flex;flex-direction:row;gap:10px;padding:12px 15px 15px;border:0;border-bottom:1px solid #353d33;overflow-x:auto;scroll-snap-type:x mandatory;background:#090d0adf}
+  .archive-shell{display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+  .archive-case-rail{flex:none;display:flex;flex-direction:row;gap:10px;padding:12px 15px 15px;border:0;border-bottom:1px solid #353d33;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch;background:#090d0adf}
   .archive-case-rail>span,.archive-case-progress{display:none}
   .archive-case-rail>button{flex:0 0 min(76vw,310px);min-height:142px;display:grid;grid-template-columns:1fr auto;align-content:end;padding:56px 14px 13px;scroll-snap-align:start;border-color:#3b4439;background:#111612}
   .archive-case-rail .case-card-cover{opacity:.32;background-position:center 35%}
   .archive-case-rail>button:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 10%,#090d0ce8 78%);z-index:0}
   .archive-case-rail>button>*:not(.case-card-cover){z-index:2}
   .archive-case-rail>button strong{font-size:23px}.archive-case-rail>button small{font-size:7px}.archive-case-rail>button i{font-size:10px}
-  .archive-main{padding:16px 15px calc(38px + env(safe-area-inset-bottom));overscroll-behavior:contain}
+  .archive-main{overflow:visible;padding:16px 15px calc(38px + env(safe-area-inset-bottom));overscroll-behavior:auto}
   .archive-case-heading{position:relative;display:block;min-height:245px;padding:26px 19px 20px;overflow:hidden;border:1px solid #41493e;background:linear-gradient(180deg,#11161099,#090c0bea)}
   .archive-case-heading:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent,#090c0bf5),repeating-linear-gradient(90deg,transparent 0 54px,#dce58109 55px);pointer-events:none}
   .archive-case-heading>div,.archive-case-heading>p{position:relative;z-index:1}.archive-case-heading>p{max-width:92%;margin-top:34px;color:#c0c7bb;font-size:12px}.archive-case-heading h1{font-size:clamp(48px,14vw,76px);line-height:.84;margin-top:13px;overflow-wrap:anywhere}.archive-case-heading span{font-size:8px}
   .archive-case-cover{display:block;position:absolute;inset:0;z-index:0;min-height:0;border:0}.archive-case-cover.is-loaded img{opacity:.3}.archive-case-cover figcaption{display:none}.archive-case-cover:after{background:linear-gradient(180deg,#080b0933 0,#080b09f5 92%)}
   .archive-tabs{top:0;margin:0 -15px;padding-left:15px;background:#090d0af5;backdrop-filter:blur(13px);scrollbar-width:none;z-index:6}.archive-tabs::-webkit-scrollbar{display:none}.archive-tabs button{min-height:49px;padding:14px 16px;font-size:8px}.archive-tabs button.active{box-shadow:inset 0 -3px 0 #11140f}
-  .case-progress-checklist.is-sticky{position:sticky;top:49px;z-index:5;margin:0 -15px;padding:11px 15px 12px;border-left:0;border-right:0;background:#0b0f0cf2;backdrop-filter:blur(14px);box-shadow:0 8px 22px #0007}
+  .case-progress-checklist.is-sticky{position:static;margin:0 -15px;padding:11px 15px 12px;border-left:0;border-right:0;background:#0b0f0cf2;backdrop-filter:blur(14px);box-shadow:0 8px 22px #0007}
   .case-progress-checklist header strong{font-size:22px}.case-progress-checklist ul{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.case-progress-checklist ul::-webkit-scrollbar{display:none}.case-progress-checklist li{flex:0 0 auto;min-width:112px;min-height:36px;align-items:center}.case-progress-checklist li span{white-space:nowrap}
   .archive-atmosphere-strip{height:126px;margin:15px 0 0}.archive-atmosphere-strip figcaption{font-size:7px}
   .archive-documents{grid-template-columns:1fr;gap:17px;padding-top:18px}.archive-document-list{border:1px solid #333c31}.archive-document-list>button{min-height:76px;grid-template-columns:70px minmax(0,1fr) auto;padding:10px}.archive-document-list>button>strong{font-size:18px}.archive-document-list>button>small{display:block}
